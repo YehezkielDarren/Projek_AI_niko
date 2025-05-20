@@ -54,10 +54,11 @@ function extractCity(text) {
   const match = text.match(regex);
   if (match) {
     const raw = match[1].trim().toLowerCase().split(' ')[0];
-    if (aliases[raw]) return aliases[raw];
-    if (Object.values(aliases).includes(raw)) return raw;
+    if (aliases[raw]) return aliases[raw]; // alias yg dikenal
+    return raw; // fallback: anggap ini nama kota langsung
   }
 
+  // fallback kedua: cari kota dari semua alias yang diketahui
   const all = Object.keys(aliases).concat(Object.values(aliases));
   for (const city of all) {
     if (text.toLowerCase().includes(city)) return aliases[city] || city;
@@ -65,6 +66,7 @@ function extractCity(text) {
 
   return null;
 }
+
 
 function extractDateFromText(text) {
   const today = new Date();
@@ -125,23 +127,32 @@ async function fetchWeather(city, dateStr, intent) {
     };
   } else {
     const current = data.current;
+    const conditionText = current.condition.text.toLowerCase();
+    const isRaining = ['hujan', 'rain', 'shower', 'drizzle', 'gerimis'].some(word => conditionText.includes(word));
+
     weather = {
       city: data.location.name,
       temp: current.temp_c,
       condition: translateCondition(current.condition.text),
-      isRaining: current.condition.text.toLowerCase().includes("hujan")
+      isRaining: isRaining
     };
-  }
 
-  const label = dateStr ? `Pada ${dateStr}` : 'Saat ini';
-  if (intent === 'rain') {
-    const response = weather.isRaining
-      ? `${label} di ${weather.city} sedang atau kemungkinan besar hujan (${weather.condition}).`
-      : `${label} di ${weather.city} tidak hujan.`;
-    addMessage(response);
-  } else {
-    addMessage(`${label} di ${weather.city}:\n- Suhu: ${weather.temp}°C\n- Kondisi: ${weather.condition}\n- Hujan: ${weather.isRaining ? 'Ya' : 'Tidak'}`);
-  }
+  };
+  
+
+const label = dateStr ? `Pada ${dateStr}` : 'Saat ini';
+const detailLink = `<br><a href="detail.html?city=${encodeURIComponent(weather.city)}" target="_blank">Lihat detail cuaca di ${weather.city} →</a>`;
+
+if (intent === 'rain') {
+  const response = weather.isRaining
+    ? `${label} di ${weather.city} sedang atau kemungkinan besar hujan (${weather.condition}).${detailLink}`
+    : `${label} di ${weather.city} tidak hujan.${detailLink}`;
+  addMessage(response);
+} else {
+  addMessage(`${label} di ${weather.city}:<br>
+    - Suhu: ${weather.temp}°C<br>
+    - Kondisi: ${weather.condition}${detailLink}`);
+}
 }
 
 async function fetchEarthquake() {
