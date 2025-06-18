@@ -1,39 +1,6 @@
 const axios = require("axios");
 const Message = require("../models/message.model");
-
-const cityAliases = {
-  jogja: "yogyakarta",
-  joga: "yogyakarta",
-  jogjakarta: "yogyakarta",
-  jkt: "jakarta",
-  dki: "jakarta",
-  ibukota: "jakarta",
-  bdg: "bandung",
-  "kota kembang": "bandung",
-  sby: "surabaya",
-  "kota pahlawan": "surabaya",
-  makasar: "makassar",
-  medan: "medan",
-  mdn: "medan",
-  pekalongan: "pekalongan",
-  "kota batik": "pekalongan",
-  semarang: "semarang",
-  smg: "semarang",
-  solo: "surakarta",
-  malang: "malang",
-  "kota apel": "malang",
-  denpasar: "denpasar",
-  bali: "denpasar",
-  palembang: "palembang",
-  pempek: "palembang",
-  batam: "batam",
-  kepri: "batam",
-  balikpapan: "balikpapan",
-  bpp: "balikpapan",
-  pontianak: "pontianak",
-  "kota khatulistiwa": "pontianak",
-  indonesia: "indonesia",
-};
+const CityAlias = require("../models/cityAlias.model");
 
 function detectIntent(text) {
   const lowerText = text.toLowerCase();
@@ -56,20 +23,26 @@ function detectIntent(text) {
   return "weather"; // Default ke cuaca jika tidak jelas
 }
 
-function extractCity(text) {
+// tambahkan untuk query db
+async function extractCity(text) {
   const cleanText = text.toLowerCase().replace(/[^\w\s]/g, " ");
   const words = cleanText.split(" ");
+
   for (const word of words) {
-    if (cityAliases[word]) {
-      return cityAliases[word];
+    const foundAlias = await CityAlias.findOne({ alias: word });
+    if (foundAlias) {
+      return foundAlias.cityName;
     }
   }
-  // Mencari nama kota secara langsung (contoh: "di jakarta")
-  for (const city in cityAliases) {
-    if (cleanText.includes(cityAliases[city])) {
-      return cityAliases[city];
+
+  // Fallback: Jika tidak ada alias yang cocok, coba cari nama kota resmi secara langsung
+  const allAliases = await CityAlias.find({});
+  for (const aliasDoc of allAliases) {
+    if (cleanText.includes(aliasDoc.cityName)) {
+      return aliasDoc.cityName;
     }
   }
+
   return null;
 }
 
@@ -160,7 +133,7 @@ exports.processMessage = async (req, res) => {
     // --- Logika untuk menentukan balasan bot (tetap sama) ---
     const intent = detectIntent(message);
     let botReplyText = "";
-    const location = extractCity(message);
+    const location = await extractCity(message);
 
     switch (intent) {
       case "greeting":
